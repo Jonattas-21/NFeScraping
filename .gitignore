@@ -1,4 +1,6 @@
 cmd.exe
 .vscode/launch.json
 input/teste-3.pdf
-output_screenshots/00024153_print.png
+output_screenshots/
+output_images/
+input
