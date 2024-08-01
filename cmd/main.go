@@ -49,12 +49,9 @@ func extractAndSaveNotaFiscalImages(pdfPath string) error {
 				fmt.Printf("Código de Verificação: %s\n", nfe.CodigoVerificacao)
 				fmt.Printf("Município: %s\n", nfe.Municipio)
 				fmt.Printf("Número da Nota: %s\n", nfe.NumeroNota)
-				fmt.Println("==============================================================")
 
 				nfe.ScrapingNotaFiscalSP()
-				//Nfes = append(Nfes, nfe)
-
-				fmt.Printf("Imagem %s contém uma Nota Fiscal.\n", imagePath)
+				fmt.Println("==============================================================")
 
 			} else {
 				// Se não for uma nota fiscal, pode optar por excluir a imagem
