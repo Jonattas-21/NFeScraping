@@ -39,9 +39,7 @@ func ExtractImagesFromPDF(pdfPath string) ([]string, error) {
 
 // Função para verificar se o texto contém padrões de uma nota fiscal
 func IsNotaFiscal(text string) bool {
-
 	palavrasChave := []string{"NOTA FISCAL", "NFS-e"}
-
 	count := len(palavrasChave)
 	for _, palavra := range palavrasChave {
 		if strings.Contains(strings.ToUpper(text), strings.ToUpper(palavra)) {

@@ -43,15 +43,11 @@ func extractAndSaveNotaFiscalImages(pdfPath string) error {
 				nfe.ExtractCodigoVerificacao()
 				nfe.ExtractMunicipio()
 				nfe.ExtractNumeroNota()
-
-				fmt.Printf("Imagem %s contém uma Nota Fiscal.\n", imagePath)
-				fmt.Printf("CNPJ: %s\n", nfe.CNPJ)
-				fmt.Printf("Código de Verificação: %s\n", nfe.CodigoVerificacao)
-				fmt.Printf("Município: %s\n", nfe.Municipio)
-				fmt.Printf("Número da Nota: %s\n", nfe.NumeroNota)
-
-				nfe.ScrapingNotaFiscalSP()
-				fmt.Println("==============================================================")
+				nfe.CorectExtractNotaFiscal()
+				if nfe.CorectExtract {
+					nfe.ScrapingNotaFiscalSP()
+				}
+				FoundNotaFiscal = append(FoundNotaFiscal, nfe)
 
 			} else {
 				// Se não for uma nota fiscal, pode optar por excluir a imagem
@@ -63,11 +59,32 @@ func extractAndSaveNotaFiscalImages(pdfPath string) error {
 	return nil
 }
 
+var FoundNotaFiscal []NotaFiscal
+
+func CleanUp() {
+	os.RemoveAll("./output_screenshots/")
+	os.RemoveAll("./output_images/")
+}
+
 func main() {
-	pdfPath := "./input/teste-1.pdf"
+	pdfPath := "./input_pdfs/teste-4.pdf"
+	defer CleanUp()
 
 	// Extrair e salvar imagens de notas fiscais
 	err := extractAndSaveNotaFiscalImages(pdfPath)
+
+	for _, nfe := range FoundNotaFiscal {
+		fmt.Println("========================= NF ===================================")
+		fmt.Printf("CNPJ: %s\n", nfe.CNPJ)
+		fmt.Printf("Código de Verificação: %s\n", nfe.CodigoVerificacao)
+		fmt.Printf("Município: %s\n", nfe.Municipio)
+		fmt.Printf("Número da Nota: %s\n", nfe.NumeroNota)
+		fmt.Printf("Extração correta: %t\n", nfe.CorectExtract)
+		fmt.Printf("Status: %s\n", nfe.Status)
+		//fmt.Printf("Texto NF: %s\n", nfe.FullText)
+		//fmt.Printf("Texto NF consultada: %s\n", nfe.RequestResult)
+	}
+
 	if err != nil {
 		log.Fatalf("Erro ao extrair imagens do PDF: %v", err)
 	}

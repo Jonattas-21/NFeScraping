@@ -19,6 +19,9 @@ type NotaFiscal struct {
 	NumeroNota        string
 	FullText          string
 	ScreenshotPath    string
+	Status            string
+	CorectExtract     bool
+	RequestResult     string
 }
 
 // Função para extrair o CNPJ
@@ -65,15 +68,31 @@ func (nfe *NotaFiscal) ExtractNumeroNota() {
 	nfe.NumeroNota = match
 }
 
+func (nfe *NotaFiscal) CorectExtractNotaFiscal() {
+	if nfe.NumeroNota != "" && nfe.CNPJ != "" && nfe.CodigoVerificacao != "" {
+		nfe.CorectExtract = true
+	} else {
+		nfe.CorectExtract = false
+	}
+}
+
 func (nfe *NotaFiscal) IsValidNotaFiscal() (bool, error) {
-
 	text, err := PerformOCR(nfe.ScreenshotPath)
+	nfe.RequestResult = text
 
-	log.Println("Texto extraído da imagem: \n", text)
-
-	if strings.Contains(strings.ToUpper(text), "CANCELADA") || strings.Contains(strings.ToUpper(text), "CANLELADA") {
-		log.Println("Nota fiscal cancelada.")
+	if strings.Contains(text, "Número da NFS-e e Código de Verificação não conferem.") {
+		nfe.Status = "CAMPOS INVALIDOS"
 		return false, nil
+	}
+
+	stgCancelada := []string{"CANCELADA", "CANBELADA", "CANCELADA"}
+
+	for _, stg := range stgCancelada {
+		if strings.Contains(strings.ToUpper(text), stg) {
+			nfe.Status = "CANCELADA"
+			log.Println("Nota fiscal cancelada.")
+			return false, nil
+		}
 	}
 
 	if err != nil {
@@ -81,8 +100,7 @@ func (nfe *NotaFiscal) IsValidNotaFiscal() (bool, error) {
 		return false, err
 	}
 
-	//validar se o texto contém padrões de uma nota fiscal valida
-	log.Println("Nota fiscal válida.")
+	nfe.Status = "VÁLIDA"
 	return true, nil
 }
 
@@ -101,12 +119,12 @@ func (nfe *NotaFiscal) ScrapingNotaFiscalSP() error {
 	fmt.Println("Iniciando scraping para a nota fiscal:", nfe.NumeroNota)
 
 	// Variável para armazenar o resultado extraído
-	var result string
+	//var result string = "teste"
 	var screenshot []byte
 
-	nfe.CNPJ = "30.627.283/0001-67"
-	nfe.CodigoVerificacao = "K5PA-R7VG"
-	nfe.NumeroNota = "00000387"
+	// nfe.CNPJ = "30.627.283/0001-67"
+	// nfe.CodigoVerificacao = "K5PA-R7VG"
+	// nfe.NumeroNota = "00000387"
 
 	// Executar tarefas
 	err := chromedp.Run(ctx,
@@ -118,7 +136,7 @@ func (nfe *NotaFiscal) ScrapingNotaFiscalSP() error {
 		chromedp.Click(`#ctl00_body_btVerificar`, chromedp.ByID),
 		chromedp.Sleep(5*time.Second),
 		chromedp.FullScreenshot(&screenshot, 100),
-		chromedp.OuterHTML(`#ctl00_cphBase_img`, &result, chromedp.ByID),
+		//chromedp.OuterHTML(`#ctl00_cphBase_img`, &result, chromedp.ByID),
 	)
 
 	if err != nil {
@@ -126,30 +144,25 @@ func (nfe *NotaFiscal) ScrapingNotaFiscalSP() error {
 		return err
 	}
 
-	log.Println("Formulário preenchido e enviado com sucesso.")
-
-	if result != "" {
-		log.Println("Resultado extraído com sucesso, agora vamos baixar a imagem.")
-
-		// Pasta onde a captura de tela será salva
-		outputDir, err := CreateOutputDir()
-		if err != nil {
-			return err
-		}
-
-		// Caminho completo para salvar a captura de tela
-		filePath := fmt.Sprintf("%s/%s_print.png", outputDir, nfe.NumeroNota)
-		nfe.ScreenshotPath = filePath
-
-		// Salvar captura de tela
-		err = ioutil.WriteFile(filePath, screenshot, 0644)
-		if err != nil {
-			log.Fatalf("Erro ao salvar captura de tela: %v", err)
-			return err
-		}
-
-		nfe.IsValidNotaFiscal()
+	log.Println("Resultado extraído com sucesso, agora vamos baixar a imagem.")
+	// Pasta onde a captura de tela será salva
+	outputDir, err := CreateOutputDir()
+	if err != nil {
+		return err
 	}
+
+	// Caminho completo para salvar a captura de tela
+	filePath := fmt.Sprintf("%s/%s_print.png", outputDir, nfe.NumeroNota)
+	nfe.ScreenshotPath = filePath
+
+	// Salvar captura de tela
+	err = ioutil.WriteFile(filePath, screenshot, 0644)
+	if err != nil {
+		log.Fatalf("Erro ao salvar captura de tela: %v", err)
+		return err
+	}
+
+	nfe.IsValidNotaFiscal()
 
 	return nil
 }
