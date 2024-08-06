@@ -1,10 +1,11 @@
-package main
+package domain
 
 import (
 	"context"
 	"fmt"
 	"io/ioutil"
 	"log"
+	"nfe-scraping/infrastructure"
 	"regexp"
 	"strings"
 	"time"
@@ -22,6 +23,7 @@ type NotaFiscal struct {
 	Status            string
 	CorectExtract     bool
 	RequestResult     string
+	DocumentPage      int
 }
 
 // Função para extrair o CNPJ
@@ -77,7 +79,7 @@ func (nfe *NotaFiscal) CorectExtractNotaFiscal() {
 }
 
 func (nfe *NotaFiscal) IsValidNotaFiscal() (bool, error) {
-	text, err := PerformOCR(nfe.ScreenshotPath)
+	text, err := infrastructure.PerformOCR(nfe.ScreenshotPath)
 	nfe.RequestResult = text
 
 	if strings.Contains(text, "Número da NFS-e e Código de Verificação não conferem.") {
@@ -96,7 +98,7 @@ func (nfe *NotaFiscal) IsValidNotaFiscal() (bool, error) {
 	}
 
 	if err != nil {
-		log.Printf("Erro ao executar OCR na imagem %s: %v", nfe.ScreenshotPath, err)
+		log.Printf("error executing ocr in image %s: %v", nfe.ScreenshotPath, err)
 		return false, err
 	}
 
@@ -105,8 +107,6 @@ func (nfe *NotaFiscal) IsValidNotaFiscal() (bool, error) {
 }
 
 func (nfe *NotaFiscal) ScrapingNotaFiscalSP() error {
-	fmt.Println("Começou o scraping.")
-
 	ctx, cancel := chromedp.NewContext(context.Background())
 	defer cancel()
 
@@ -116,10 +116,9 @@ func (nfe *NotaFiscal) ScrapingNotaFiscalSP() error {
 	// URL da página de verificação
 	url := "https://nfe.prefeitura.sp.gov.br/publico/verificacao.aspx"
 
-	fmt.Println("Iniciando scraping para a nota fiscal:", nfe.NumeroNota)
+	fmt.Println("Scraping starts for NF:", nfe.NumeroNota)
 
 	// Variável para armazenar o resultado extraído
-	//var result string = "teste"
 	var screenshot []byte
 
 	// nfe.CNPJ = "30.627.283/0001-67"
@@ -140,13 +139,13 @@ func (nfe *NotaFiscal) ScrapingNotaFiscalSP() error {
 	)
 
 	if err != nil {
-		log.Fatalf("Erro ao executar chromedp: %v", err)
+		log.Fatalf("error executing chromedp: %v", err)
 		return err
 	}
 
-	log.Println("Resultado extraído com sucesso, agora vamos baixar a imagem.")
+	log.Println("Scraping was successful. Now lets save the screenshot.")
 	// Pasta onde a captura de tela será salva
-	outputDir, err := CreateOutputDir()
+	outputDir, err := infrastructure.CreateOutputDir()
 	if err != nil {
 		return err
 	}
@@ -158,11 +157,51 @@ func (nfe *NotaFiscal) ScrapingNotaFiscalSP() error {
 	// Salvar captura de tela
 	err = ioutil.WriteFile(filePath, screenshot, 0644)
 	if err != nil {
-		log.Fatalf("Erro ao salvar captura de tela: %v", err)
+		log.Fatalf("error saving the screenshot: %v", err)
 		return err
 	}
 
 	nfe.IsValidNotaFiscal()
 
 	return nil
+}
+
+// Função para verificar se o texto contém padrões de uma nota fiscal
+func IsNotaFiscal(text string) bool {
+	palavrasChave := []string{"NOTA FISCAL", "NFS-e"}
+	count := len(palavrasChave)
+	for _, palavra := range palavrasChave {
+		if strings.Contains(strings.ToUpper(text), strings.ToUpper(palavra)) {
+			count--
+		}
+	}
+
+	return count == 0
+}
+
+func (nfe *NotaFiscal) PrepareForExcel() []string {
+
+	var values []string
+
+	values = append(values, nfe.CNPJ)
+	values = append(values, nfe.CodigoVerificacao)
+	values = append(values, nfe.NumeroNota)
+	values = append(values, nfe.Municipio)
+	values = append(values, fmt.Sprintf("%t", nfe.CorectExtract))
+	values = append(values, nfe.Status)
+	values = append(values, fmt.Sprintf("%d", nfe.DocumentPage))
+
+	return values
+}
+
+func PrepareNfeColumnsForExcel() []string {
+	return []string{
+		"CNPJ tomador de serviço",
+		"Código de verificação",
+		"Número da nota",
+		"Município",
+		"Extraiu corretamente?",
+		"Status da nota fiscal consultada",
+		"Página no documento",
+	}
 }

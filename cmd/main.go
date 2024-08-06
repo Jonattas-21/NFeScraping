@@ -4,11 +4,13 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"nfe-scraping/domain"
+	"nfe-scraping/infrastructure"
 	"os"
 	"os/exec"
 )
 
-// Função para extrair e salvar imagens de notas fiscais
+// Function to extract and save images of invoices from a PDF file
 func extractAndSaveNotaFiscalImages(pdfPath string) error {
 	outputDir := "./output_images"
 	if err := os.MkdirAll(outputDir, os.ModePerm); err != nil {
@@ -28,17 +30,15 @@ func extractAndSaveNotaFiscalImages(pdfPath string) error {
 	for _, file := range files {
 		if !file.IsDir() {
 			imagePath := outputDir + "/" + file.Name()
-			text, err := PerformOCR(imagePath)
+			text, err := infrastructure.PerformOCR(imagePath)
 
 			if err != nil {
-				log.Printf("Erro ao executar OCR na imagem %s: %v", imagePath, err)
+				log.Printf("Error in OCR execution %s: %v", imagePath, err)
 				continue
 			}
 
-			if IsNotaFiscal(text) {
-				nfe := NotaFiscal{FullText: text}
-
-				// Extrair e imprimir informações da nota fiscal
+			if domain.IsNotaFiscal(text) {
+				nfe := domain.NotaFiscal{FullText: text}
 				nfe.ExtractCNPJ()
 				nfe.ExtractCodigoVerificacao()
 				nfe.ExtractMunicipio()
@@ -46,11 +46,14 @@ func extractAndSaveNotaFiscalImages(pdfPath string) error {
 				nfe.CorectExtractNotaFiscal()
 				if nfe.CorectExtract {
 					nfe.ScrapingNotaFiscalSP()
+				} else {
+					nfe.Status = "NÃO PROCESSADA CORRETAMENTE"
 				}
+				nfe.DocumentPage, _ = infrastructure.ExtractPageFromFileImageName(imagePath)
 				FoundNotaFiscal = append(FoundNotaFiscal, nfe)
 
 			} else {
-				// Se não for uma nota fiscal, pode optar por excluir a imagem
+				// Delete image file if it is not an invoice
 				os.Remove(imagePath)
 			}
 		}
@@ -59,20 +62,17 @@ func extractAndSaveNotaFiscalImages(pdfPath string) error {
 	return nil
 }
 
-var FoundNotaFiscal []NotaFiscal
-
-func CleanUp() {
-	os.RemoveAll("./output_screenshots/")
-	os.RemoveAll("./output_images/")
-}
+var FoundNotaFiscal []domain.NotaFiscal
 
 func main() {
 	pdfPath := "./input_pdfs/teste-4.pdf"
-	defer CleanUp()
+	defer infrastructure.CleanUp()
 
 	// Extrair e salvar imagens de notas fiscais
 	err := extractAndSaveNotaFiscalImages(pdfPath)
 
+	colunsForExcel := domain.PrepareNfeColumnsForExcel()
+	var excelNfeVCalues [][]string
 	for _, nfe := range FoundNotaFiscal {
 		fmt.Println("========================= NF ===================================")
 		fmt.Printf("CNPJ: %s\n", nfe.CNPJ)
@@ -81,11 +81,15 @@ func main() {
 		fmt.Printf("Número da Nota: %s\n", nfe.NumeroNota)
 		fmt.Printf("Extração correta: %t\n", nfe.CorectExtract)
 		fmt.Printf("Status: %s\n", nfe.Status)
-		//fmt.Printf("Texto NF: %s\n", nfe.FullText)
-		//fmt.Printf("Texto NF consultada: %s\n", nfe.RequestResult)
+
+		//Build excel output
+		infrastructure.CreateExcelOutputDir()
+		excelNfeVCalues = append(excelNfeVCalues, nfe.PrepareForExcel())
 	}
 
+	infrastructure.CreateExcelOutput(colunsForExcel, excelNfeVCalues)
+
 	if err != nil {
-		log.Fatalf("Erro ao extrair imagens do PDF: %v", err)
+		log.Fatalf("error extracting images from PDF: %v", err)
 	}
 }
