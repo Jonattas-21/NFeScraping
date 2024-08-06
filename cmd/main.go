@@ -8,6 +8,7 @@ import (
 	"nfe-scraping/infrastructure"
 	"os"
 	"os/exec"
+	"strings"
 
 	"github.com/joho/godotenv"
 )
@@ -66,20 +67,8 @@ func extractAndSaveNotaFiscalImages(pdfPath string) error {
 
 var FoundNotaFiscal []domain.NotaFiscal
 
-func main() {
-
-	err := godotenv.Load()
-	if err != nil {
-		log.Fatalf("Error loading .env file")
-	}
-
-	pdfPath := os.Getenv("PDFINPUTPATH")
-
-	defer infrastructure.CleanUp()
-
-	// Extrair e salvar imagens de notas fiscais
-	err = extractAndSaveNotaFiscalImages(pdfPath)
-
+// Function to show the results of the scraping
+func showResults() {
 	colunsForExcel := domain.PrepareNfeColumnsForExcel()
 	var excelNfeVCalues [][]string
 	for _, nfe := range FoundNotaFiscal {
@@ -95,10 +84,41 @@ func main() {
 		infrastructure.CreateExcelOutputDir()
 		excelNfeVCalues = append(excelNfeVCalues, nfe.PrepareForExcel())
 	}
-
 	infrastructure.CreateExcelOutput(colunsForExcel, excelNfeVCalues)
+}
 
+func main() {
+	err := godotenv.Load()
 	if err != nil {
-		log.Fatalf("error extracting images from PDF: %v", err)
+		log.Fatalf("Error loading .env file")
 	}
+
+	pdfPath := os.Getenv("PDFINPUTPATH")
+	defer infrastructure.CleanUp()
+
+	for {
+		fmt.Println("Type 'go' and press ENTER to begin scraping or type 'quit' and press enter to quit:")
+		var msg string
+		fmt.Scanln(&msg)
+
+		if strings.ToUpper(msg) == "QUIT" {
+			break
+		}
+
+		if strings.ToUpper(msg) == "GO" {
+			fmt.Println("Great! this job can take a while, please wait...")
+			// Extrair e salvar imagens de notas fiscais
+			err = extractAndSaveNotaFiscalImages(pdfPath)
+			if err != nil {
+				log.Fatalf("error extracting images from PDF: %v", err)
+			}
+
+			showResults()
+			fmt.Println("******** the job is done, check the output folder for the results ********")
+			continue
+		}
+	}
+
+	log.Println("closing the application")
+	fmt.Println("Bye, until next time!")
 }
