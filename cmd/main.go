@@ -8,6 +8,8 @@ import (
 	"nfe-scraping/infrastructure"
 	"os"
 	"os/exec"
+
+	"github.com/joho/godotenv"
 )
 
 // Function to extract and save images of invoices from a PDF file
@@ -65,11 +67,18 @@ func extractAndSaveNotaFiscalImages(pdfPath string) error {
 var FoundNotaFiscal []domain.NotaFiscal
 
 func main() {
-	pdfPath := "./input_pdfs/teste-4.pdf"
+
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatalf("Error loading .env file")
+	}
+
+	pdfPath := os.Getenv("PDFINPUTPATH")
+
 	defer infrastructure.CleanUp()
 
 	// Extrair e salvar imagens de notas fiscais
-	err := extractAndSaveNotaFiscalImages(pdfPath)
+	err = extractAndSaveNotaFiscalImages(pdfPath)
 
 	colunsForExcel := domain.PrepareNfeColumnsForExcel()
 	var excelNfeVCalues [][]string
