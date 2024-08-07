@@ -49,7 +49,12 @@ func (nfe *NotaFiscal) ExtractCodigoVerificacao() {
 	codigoPattern := regexp.MustCompile(`(?:Código de Verificação|Codigo de Verificacao|Códig de Verificagao|Cédigo de Verificagao|Cédig de Verificagao)[^\n]*\n.*\b([A-Z0-9]{4}-[A-Z0-9]{4})\b`)
 	match := codigoPattern.FindStringSubmatch(nfe.FullText)
 	if len(match) > 1 {
-		nfe.CodigoVerificacao = match[1]
+		// Check if the code has at least 2 letters and 2 numbers
+		if len(regexp.MustCompile(`[A-Z0-9]`).FindAllString(match[1], -1)) >= 2 {
+			nfe.CodigoVerificacao = match[1]
+		} else {
+			log.Fatal("verify code has less than 2 letters and 2 numbers")
+		}
 	}
 }
 
@@ -78,8 +83,13 @@ func (nfe *NotaFiscal) CorectExtractNotaFiscal() {
 	}
 }
 
-func (nfe *NotaFiscal) IsValidNotaFiscal() (bool, error) {
+func (nfe *NotaFiscal) IsValidQueryNotaFiscal() (bool, error) {
 	text, err := infrastructure.PerformOCR(nfe.ScreenshotPath)
+	if err != nil {
+		log.Printf("error executing ocr in image %s: %v", nfe.ScreenshotPath, err)
+		return false, err
+	}
+
 	nfe.RequestResult = text
 
 	if strings.Contains(text, "Número da NFS-e e Código de Verificação não conferem.") {
@@ -95,11 +105,6 @@ func (nfe *NotaFiscal) IsValidNotaFiscal() (bool, error) {
 			log.Println("Nota fiscal cancelada.")
 			return false, nil
 		}
-	}
-
-	if err != nil {
-		log.Printf("error executing ocr in image %s: %v", nfe.ScreenshotPath, err)
-		return false, err
 	}
 
 	nfe.Status = "VÁLIDA"
@@ -161,7 +166,7 @@ func (nfe *NotaFiscal) ScrapingNotaFiscalSP() error {
 		return err
 	}
 
-	nfe.IsValidNotaFiscal()
+	nfe.IsValidQueryNotaFiscal()
 
 	return nil
 }
