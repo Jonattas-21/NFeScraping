@@ -103,9 +103,7 @@ func main() {
 
 		if strings.ToUpper(msg) == "QUIT" {
 			break
-		}
-
-		if strings.ToUpper(msg) == "GO" {
+		} else if strings.ToUpper(msg) == "GO" {
 			fmt.Println("Great! this job can take a while, please wait...")
 			// Extrair e salvar imagens de notas fiscais
 			err = extractAndSaveNotaFiscalImages(pdfPath)
@@ -114,8 +112,12 @@ func main() {
 			}
 
 			showResults()
+			fmt.Println()
 			fmt.Println("******** the job is done, check the output folder for the results ********")
+			fmt.Println()
 			continue
+		} else {
+			fmt.Println("Invalid command, please type 'go' or 'quit'")
 		}
 	}
 
